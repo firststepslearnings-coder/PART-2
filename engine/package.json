@@ -4,17 +4,21 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node dist/server.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cortex/shared": "*",
     "ccxt": "^4.4.82",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
     "technicalindicators": "^3.1.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
     "@types/node": "^22.7.4",
     "tsx": "^4.19.1",
     "typescript": "^5.5.3"

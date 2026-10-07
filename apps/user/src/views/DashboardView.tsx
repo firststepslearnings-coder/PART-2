@@ -13,7 +13,7 @@ const accentMap = {
 };
 
 export default function DashboardView() {
-  const { formatCurrency, formatCompact } = useApp();
+  const { formatCurrency, formatCompact, livePrices, liveConnected } = useApp();
   const [deployed, setDeployed] = useState<Set<string>>(new Set());
   const [bots, setBots] = useState<Bot[]>([]);
   const [trades, setTrades] = useState<TradeHistory[]>([]);
@@ -31,6 +31,13 @@ export default function DashboardView() {
   const activeCount = bots.filter(b => b.status === 'running').length;
   const winCount = trades.filter(t => Number(t.pnl) > 0).length;
   const winRate = trades.length > 0 ? ((winCount / trades.length) * 100).toFixed(1) : '0.0';
+
+  const liveCoins = coins.map(c => {
+    const lp = livePrices[c.symbol];
+    return lp
+      ? { ...c, price: lp.price, change24h: lp.change24h, volume24h: lp.volume24h, sparkline: lp.sparkline.length > 1 ? lp.sparkline : c.sparkline }
+      : c;
+  });
 
   return (
     <div className="space-y-6 animate-slide-up">
@@ -220,9 +227,15 @@ export default function DashboardView() {
           <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
             <Activity className="w-4 h-4 text-neon-cyan" />
             Top Movers (24h)
+            <span className={`ml-auto flex items-center gap-1 text-[10px] font-semibold ${liveConnected ? 'text-neon-green' : 'text-neon-amber'}`}>
+              <span className={`relative flex h-1.5 w-1.5 ${liveConnected ? '' : 'animate-pulse'}`}>
+                <span className={`absolute inline-flex h-full w-full rounded-full ${liveConnected ? 'bg-neon-green' : 'bg-neon-amber'} opacity-75`} />
+              </span>
+              {liveConnected ? 'LIVE' : 'CONNECTING'}
+            </span>
           </h3>
           <div className="space-y-2">
-            {[...coins].sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h)).slice(0, 5).map((c) => (
+            {[...liveCoins].sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h)).slice(0, 5).map((c) => (
               <div key={c.symbol} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-white/[0.03] transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-white/[0.05] border border-white/[0.06] flex items-center justify-center text-[10px] font-bold text-slate-300">
@@ -236,7 +249,7 @@ export default function DashboardView() {
                 <div className="flex items-center gap-3">
                   <Sparkline data={c.sparkline} color={c.change24h >= 0 ? '#00ff9d' : '#ff3b5c'} width={60} height={24} />
                   <div className="text-right">
-                    <p className="text-sm font-mono text-slate-200">${c.price.toLocaleString()}</p>
+                    <p className="text-sm font-mono text-slate-200">${c.price < 1 ? c.price.toFixed(4) : c.price.toLocaleString()}</p>
                     <p className={`text-[10px] font-semibold ${c.change24h >= 0 ? 'text-neon-green' : 'text-neon-red'}`}>
                       {c.change24h >= 0 ? '+' : ''}{c.change24h.toFixed(2)}%
                     </p>

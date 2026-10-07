@@ -5,11 +5,18 @@ import { coins } from '@cortex/shared/data/mockData';
 import Sparkline from '@cortex/shared/components/Sparkline';
 
 export default function CryptoView() {
-  const { formatCompact } = useApp();
+  const { formatCompact, livePrices, liveConnected } = useApp();
   const [search, setSearch] = useState('');
   const [favorites, setFavorites] = useState<Set<string>>(new Set(['BTC', 'ETH']));
 
-  const filtered = coins.filter(c =>
+  const liveCoins = coins.map(c => {
+    const lp = livePrices[c.symbol];
+    return lp
+      ? { ...c, price: lp.price, change24h: lp.change24h, volume24h: lp.volume24h, sparkline: lp.sparkline.length > 1 ? lp.sparkline : c.sparkline }
+      : c;
+  });
+
+  const filtered = liveCoins.filter(c =>
     c.symbol.toLowerCase().includes(search.toLowerCase()) ||
     c.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -33,6 +40,12 @@ export default function CryptoView() {
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <Bitcoin className="w-5 h-5 text-neon-amber" />
             Crypto Markets
+            <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md ${liveConnected ? 'bg-neon-green/10 text-neon-green' : 'bg-neon-amber/10 text-neon-amber'}`}>
+              <span className={`relative flex h-1.5 w-1.5 ${liveConnected ? '' : 'animate-pulse'}`}>
+                <span className={`absolute inline-flex h-full w-full rounded-full ${liveConnected ? 'bg-neon-green' : 'bg-neon-amber'} opacity-75`} />
+              </span>
+              {liveConnected ? 'LIVE' : 'CONNECTING'}
+            </span>
           </h2>
           <p className="text-sm text-slate-400">Live prices and market data for top cryptocurrencies</p>
         </div>

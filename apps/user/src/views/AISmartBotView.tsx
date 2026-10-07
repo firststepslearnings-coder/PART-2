@@ -9,8 +9,10 @@ import {
 import { useApp } from '@/context/AppContext';
 import { coins } from '@cortex/shared/data/mockData';
 import { supabase } from '@cortex/shared/lib/supabase';
+import { useAuth } from '@cortex/shared/context/AuthContext';
 import BacktestModal from '@/components/BacktestModal';
 import type { BotFactoryDraft } from '@cortex/shared/types/bot';
+import { getBinanceSymbol } from '@/hooks/useLivePrices';
 
 type MarketType = 'spot' | 'futures';
 type OrderType = 'market' | 'limit';
@@ -30,7 +32,8 @@ const botTypeCards: { id: BotType; label: string; desc: string; icon: typeof Zap
 ];
 
 export default function AISmartBotView() {
-  const { formatCurrency, currency } = useApp();
+  const { formatCurrency, currency, tradingMode, livePrices } = useApp();
+  const { user } = useAuth();
 
   // Market & Asset
   const [marketType, setMarketType] = useState<MarketType>('spot');
@@ -71,7 +74,11 @@ export default function AISmartBotView() {
   // Backtest modal
   const [showBacktest, setShowBacktest] = useState(false);
 
-  const selectedCoinData = coins.find(c => c.symbol === selectedCoin) || coins[0];
+  const staticCoinData = coins.find(c => c.symbol === selectedCoin) || coins[0];
+  const livePrice = livePrices[selectedCoin]?.price;
+  const selectedCoinData = livePrice
+    ? { ...staticCoinData, price: livePrice }
+    : staticCoinData;
 
   const effectiveCapital = quantityMode === 'fixed' ? quantityValue : (capital * percentValue / 100);
   const positionSize = marketType === 'futures' ? effectiveCapital * leverage : effectiveCapital;
@@ -80,9 +87,60 @@ export default function AISmartBotView() {
   const tpDisplay = tpSlMode === 'percentage' ? `+${takeProfit}%` : `+${formatCurrency(tpFixed)}`;
   const slDisplay = tpSlMode === 'percentage' ? `-${stopLoss}%` : `-${formatCurrency(slFixed)}`;
 
+  const [launchError, setLaunchError] = useState<string | null>(null);
+
   const handleLaunch = async () => {
     setLaunching(true);
+    setLaunchError(null);
     const botName = `Custom Cortex Bot — ${selectedCoin} ${botType.charAt(0).toUpperCase() + botType.slice(1)}`;
+
+    const tradePayload = {
+      bot_name: botName,
+      bot_type: botType,
+      execution_mode: 'auto',
+      market_type: marketType,
+      trading_mode: tradingMode,
+      coin: selectedCoin,
+      pair: `${selectedCoin}/USDT`,
+      binance_symbol: getBinanceSymbol(selectedCoin),
+      direction: tradeDirection,
+      order_type: orderType,
+      entry_price: selectedCoinData.price,
+      quantity: coinAmount,
+      position_size: positionSize,
+      leverage: marketType === 'futures' ? leverage : 1,
+      take_profit_pct: tpSlMode === 'percentage' ? takeProfit : null,
+      stop_loss_pct: tpSlMode === 'percentage' ? stopLoss : null,
+      take_profit_fixed: tpSlMode === 'fixed' ? tpFixed : null,
+      stop_loss_fixed: tpSlMode === 'fixed' ? slFixed : null,
+      trailing_stop: trailingEnabled,
+      trailing_distance_pct: trailingEnabled ? trailingDistance : null,
+      rr_ratio: rrRatio,
+      max_trades_per_day: maxTradesPerDay,
+      max_daily_loss: maxDailyLoss,
+      max_daily_profit: maxDailyProfit,
+      cooldown_minutes: cooldownMinutes,
+      indicators: indicatorsEnabled ? [indicator] : [],
+      user_email: user?.email ?? null,
+    };
+
+    let engineSuccess = false;
+    try {
+      const res = await fetch('http://localhost:5000/api/place-trade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tradePayload),
+      });
+      if (res.ok) {
+        engineSuccess = true;
+      } else {
+        const errBody = await res.text();
+        console.warn('Engine responded with error:', errBody);
+      }
+    } catch (err) {
+      console.warn('Engine server not reachable, falling back to DB-only save:', err);
+    }
+
     const { error } = await supabase.from('bots').insert({
       name: botName,
       market_type: marketType,
@@ -91,11 +149,15 @@ export default function AISmartBotView() {
       status: 'running',
       profit_loss: 0,
     });
+
     setLaunching(false);
+
     if (error) {
       console.error('Failed to launch bot:', error.message);
+      setLaunchError(`Failed to save bot: ${error.message}`);
       return;
     }
+
     setLaunched(true);
     setTimeout(() => setLaunched(false), 4000);
   };
@@ -244,7 +306,8 @@ export default function AISmartBotView() {
               </div>
               <div className="mt-3 flex items-center justify-between text-xs">
                 <span className="text-slate-400">{selectedCoinData.name}</span>
-                <span className="font-mono text-slate-200">${selectedCoinData.price.toLocaleString()}</span>
+                <span className="font-mono text-slate-200">${selectedCoinData.price < 1 ? selectedCoinData.price.toFixed(4) : selectedCoinData.price.toLocaleString()}</span>
+                {livePrice && <span className="text-[10px] text-neon-green ml-1">● LIVE</span>}
               </div>
             </div>
           </Section>
@@ -650,6 +713,11 @@ export default function AISmartBotView() {
             {launched && (
               <p className="mt-3 text-center text-[11px] text-neon-green animate-fade-in">
                 Your bot is now live and scanning the market...
+              </p>
+            )}
+            {launchError && (
+              <p className="mt-3 text-center text-[11px] text-neon-red animate-fade-in">
+                {launchError}
               </p>
             )}
           </div>

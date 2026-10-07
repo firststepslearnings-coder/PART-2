@@ -2,17 +2,30 @@ import { BrainCircuit, Radio, ToggleLeft, ToggleRight, DollarSign, IndianRupee, 
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@cortex/shared/context/AuthContext';
 import { tickerItems } from '@cortex/shared/data/mockData';
+import { useMemo } from 'react';
 
 interface Props {
   onPanic: () => void;
 }
 
 export default function TopNav({ onPanic }: Props) {
-  const { currency, setCurrency, tradingMode, setTradingMode } = useApp();
+  const { currency, setCurrency, tradingMode, setTradingMode, livePrices, liveConnected } = useApp();
   const { user, signOut } = useAuth();
 
   const userEmail = user?.email ?? '';
   const emailPrefix = userEmail.split('@')[0];
+
+  const liveTicker = useMemo(() => {
+    const keys = Object.keys(livePrices);
+    if (keys.length > 0) {
+      return keys.map(k => ({
+        symbol: k,
+        price: livePrices[k].price,
+        change: livePrices[k].change24h,
+      }));
+    }
+    return tickerItems;
+  }, [livePrices]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-base-900/70 backdrop-blur-2xl">
@@ -34,16 +47,22 @@ export default function TopNav({ onPanic }: Props) {
         {/* Ticker - hidden on small screens */}
         <div className="hidden lg:flex flex-1 overflow-hidden mx-2">
           <div className="flex gap-6 animate-ticker whitespace-nowrap text-xs">
-            {[...tickerItems, ...tickerItems].map((t, i) => (
+            {[...liveTicker, ...liveTicker].map((t, i) => (
               <span key={i} className="flex items-center gap-1.5 font-mono">
                 <span className="text-slate-400">{t.symbol}</span>
-                <span className="text-slate-200">${t.price.toLocaleString()}</span>
+                <span className="text-slate-200">${t.price.toLocaleString(undefined, { maximumFractionDigits: t.price < 1 ? 4 : 2 })}</span>
                 <span className={t.change >= 0 ? 'text-neon-green' : 'text-neon-red'}>
                   {t.change >= 0 ? '+' : ''}{t.change.toFixed(2)}%
                 </span>
               </span>
             ))}
           </div>
+          <span className={`ml-2 flex items-center gap-1 text-[10px] font-semibold flex-shrink-0 ${liveConnected ? 'text-neon-green' : 'text-neon-amber'}`}>
+            <span className={`relative flex h-1.5 w-1.5 ${liveConnected ? '' : 'animate-pulse'}`}>
+              <span className={`absolute inline-flex h-full w-full rounded-full ${liveConnected ? 'bg-neon-green' : 'bg-neon-amber'} opacity-75`} />
+            </span>
+            {liveConnected ? 'LIVE' : 'CONNECTING'}
+          </span>
         </div>
 
         {/* Controls */}
