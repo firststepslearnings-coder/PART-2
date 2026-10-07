@@ -1,0 +1,22 @@
+{
+  "name": "@cortex/engine",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cortex/shared": "*",
+    "ccxt": "^4.4.82",
+    "technicalindicators": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "tsx": "^4.19.1",
+    "typescript": "^5.5.3"
+  }
+}
